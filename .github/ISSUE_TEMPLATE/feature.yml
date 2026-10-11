@@ -1,0 +1,38 @@
+name: Feature proposal
+description: Propose a user outcome with testable acceptance criteria.
+title: "[Feature]: "
+labels: ["type:feature"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Who experiences the problem and what are they trying to do?
+      placeholder: As a ... I need ... so that ...
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence the problem exists
+      description: User observation, pilot feedback, reproducible failure, or source.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Testable acceptance criteria
+      description: Include at least one failure or edge case.
+      placeholder: |
+        - Given ...
+        - When ...
+        - Then ...
+    validations:
+      required: true
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and exclusions
+      description: Data sensitivity, security, operational impact, and what is not in scope.
+    validations:
+      required: true
