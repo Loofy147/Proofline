@@ -1,26 +1,34 @@
 # Roadmap
 
-This is a hypothesis-driven sequence, not a commitment to build every item.
+This is an evidence-driven plan, not a promise to build every item.
 
 ## Stage 0 — Repository foundation
-- [x] Initialize repository and review/engineering standards.
-- [ ] CI runs tests and repository contract checks on every PR.
-- [ ] Configure branch protection and required status checks in GitHub settings.
-- [ ] Import the existing MVP only after local checks and artifact provenance are reviewed.
+
+- [x] Create repository and initial engineering/review documentation.
+- [x] Integrate the local-first browser MVP and CSV CLI.
+- [x] Add a Python 3.11/3.12/3.13 CI matrix and Chromium interaction job.
+- [x] Add current architecture, operating context, review protocol, risk, release, and provenance documentation.
+- [ ] Configure required branch protection/status checks in GitHub settings (tracked in issue #2).
+- [ ] Publish/import the full historical binary bundle after licensing and size review (tracked in issue #3; the local seed archive is preserved by SHA-256).
 
 ## Stage 1 — First repeatable paid outcome
-- [ ] Define a versioned evidence-pack schema.
-- [ ] Harden CSV validator: malformed quoting, encoding, size limits, formula-like cells in exports, and explicit ruleset version.
-- [ ] Add golden fixtures and independent expected results.
-- [ ] Produce a report with input hash, tool version, checks, findings, and reproduction instructions.
-- [ ] Run three real pilot jobs with customer permission and no unnecessary sensitive data.
-- [ ] Measure review time, useful defects found, false positives, and willingness to pay.
+
+- [x] CSV checker emits versioned JSON findings and a column-profile CSV.
+- [x] Baseline unit and Chromium tests cover common valid/invalid input and filtered export behavior.
+- [x] Filtered CSV export prefixes formula-like cells and has a browser regression test.
+- [ ] Expand adversarial CSV tests (control characters, whitespace-prefix variants, encodings, size and row limits).
+- [ ] Verify safe-export behavior in the actual spreadsheet applications used by intended customers.
+- [ ] Harden source preservation, evidence-pack schema, CLI tool/runtime provenance, and detailed check trace.
+- [ ] Interview likely customers and run at least three scoped pilot jobs with permission and appropriately redacted data.
+- [ ] Measure review time, useful defects, false positives, completion rate, and willingness to pay.
 
 ## Stage 2 — Cross-artifact verification
-- [ ] Spreadsheet adapter: recalculate with an independent engine and compare relevant cells to an independent calculation.
-- [ ] Research adapter: claim-by-claim citations, source dates, direct support, and uncertainty labels.
-- [ ] Browser QA adapter: test actual controls and exports, not only static rendering.
-- [ ] Unified evidence pack and cross-checks between displayed figures and source artifacts.
+
+- [ ] Spreadsheet adapter: recalculate with an independent engine and compare relevant cells to independent calculations.
+- [ ] Research adapter: claim-by-claim source support, publication dates, primary-source preference, and uncertainty labels.
+- [ ] Browser QA adapter: test actual controls, keyboard behavior, and downloads in the intended published environment.
+- [ ] Unified evidence pack linking inputs, hashes, check definitions, outputs, and limitations.
 
 ## Stage 3 — Productization gate
-Only consider hosted accounts, multi-tenant storage, payments, connectors, and scheduled runs after pilot evidence supports them. Before launch, complete threat modeling, access controls, retention/deletion, backup/restore, monitoring, incident response, and cost controls.
+
+Only consider hosting, accounts, multi-tenant storage, payments, connectors, and scheduled workflows after pilot evidence supports them. Before hosted customer data, complete threat modeling, access controls, tenant isolation, retention/deletion, backup/restore, monitoring, incident response, and cost/abuse controls.

@@ -1,27 +1,24 @@
 # Verification Report — Repository Integration
 
-## Implemented in this revision
+## Implemented
 
-- Self-contained local browser workbench.
-- Deterministic Python CSV audit CLI.
+- Self-contained local browser workbench: overview, audit intake, CSV checker, evidence catalog, pilot-service view.
+- Standard-library Python CSV audit CLI with input SHA-256, structure/domain checks, JSON findings and column-profile CSV.
 - Unit, repository-contract, package-integrity, and Chromium interaction tests.
-- GitHub Actions Python matrix and Chromium interaction job.
-- Documentation covering architecture, context, CI/CD, review, risks, release, pilot offer, and artifact provenance.
+- GitHub Actions CI: Python 3.11/3.12/3.13 matrix and Chromium interaction suite.
+- Architecture, operating context, review protocol, quality gates, risk/release standards, artifact provenance, licensing notes, product strategy and pilot offer.
 
 ## Executed evidence
 
-GitHub Actions run #7 on implementation commit 8bcc03f3426bc92628e404d9e4de128e8bac6710 completed successfully:
-https://github.com/Loofy147/Proofline/actions/runs/38180166264
+GitHub Actions run #10 on implementation commit 5182ad3566006de3e37c50b4a8a96cd6e2dd0489 completed successfully:
+https://github.com/Loofy147/Proofline/actions/runs/38180413208
 
-The run passed:
-- Python 3.11, 3.12, and 3.13 matrix jobs, including repository validation, unit tests, synthetic CSV fixture audit, Python compilation, and whitespace check.
-- Chromium interaction job: app self-tests, navigation, CSV sample loading and filtering, filtered CSV download round-trip (30 matching data rows plus header), malformed input handling, intake JSON export, mobile viewport overflow check, and no page JavaScript errors.
+All four jobs passed:
+- Python 3.11, 3.12 and 3.13 matrix jobs: repository validation, unit tests, synthetic CSV fixture audit, source compilation and whitespace checks.
+- Chromium interaction job: 11 embedded self-tests, all five view navigations, 90-row synthetic sample, filtering to 30 Atlas rows, downloaded CSV reopened and checked for header plus 30 matching records, malformed-row failure, intake JSON export with checks marked NOT TESTED, mobile horizontal overflow, and no browser page errors.
+- Formula-injection regression: exported text values beginning with =, +, @ and non-numeric - are prefixed with an apostrophe; an ordinary negative numeric value remains unchanged.
 
-This evidence applies to the exact implementation commit above. A later commit must pass its own pipeline before being considered validated.
-
-## Test scope
-
-The suite covers CSV quoting and multiline fields, ragged rows, duplicate headers, sales arithmetic, empty/malformed inputs, app navigation, 10 JavaScript self-tests, sample load, filtering, CSV download round-trip, invalid upload, intake JSON export, mobile horizontal overflow, and page JavaScript errors.
+This evidence applies to the exact implementation commit above. A later commit must pass its own pipeline before it is considered validated.
 
 ## Historical limitations
 
@@ -29,8 +26,8 @@ The older live-evidence board's interactive controls were not fully verified in 
 
 ## Residual risks and gaps
 
-- Filtered CSV export now prefixes formula-like text cells with an apostrophe, with a browser regression test for formula-like values. Residual risk remains for spreadsheet-specific parsing and control-character bypasses; review against target applications before production.
+- CSV formula prefixing reduces risk but is not guaranteed for all spreadsheet importers or every possible control-character bypass; test the spreadsheet apps customers use before production.
 - Browser smoke tests are not a complete WCAG or security audit.
 - Large historical binary snapshots are inventoried but not all individual Git blobs in this commit; the preserved source bundle remains a separate archive pending licensing and repository-size review.
-- No hosted-data security, accounts, customer validation, branch-protection enforcement, or production deployment exists.
-- The GitHub connector could create branches/files/PRs but couldn't confirm/configure the repository's branch-protection setting; enable required checks in repository settings after confirming the latest CI run.
+- No hosted-data security, accounts, customer validation, or production deployment exists.
+- Required branch protection/status checks were not configured or confirmed through the connected API; see issue #2.
