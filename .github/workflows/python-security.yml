@@ -1,0 +1,37 @@
+name: Python Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "41 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-checks:
+    name: Bandit and pip-audit
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Install development and security requirements
+        run: python -m pip install -r requirements-dev.txt -r requirements-security.txt
+      - name: Scan Python source
+        run: bandit -q -ll -ii -r verify_csv.py scripts
+      - name: Audit declared development and security dependencies
+        run: pip-audit -r requirements-dev.txt -r requirements-security.txt
