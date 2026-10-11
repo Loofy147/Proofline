@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Generated outputs
+dist/
+build/
+coverage.xml
+test-results/
+playwright-report/
+artifacts-local/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
