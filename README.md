@@ -38,7 +38,7 @@ For real Chromium interaction tests, install the development dependency and brow
 
 Exit codes: 0 = no configured errors (warnings may exist); 1 = data failed a structural/domain check; 2 = input or runtime error. The report records filename, size, SHA-256, row/column profiles, errors, warnings, and limitations.
 
-The checker does not prove source authenticity, factual truth, causal interpretation, or business suitability. Numeric inference uses dot-decimal syntax. Domain checks only run when the corresponding columns are present.
+The checker does not prove source authenticity, factual truth, causal interpretation, or business suitability. Numeric inference uses dot-decimal syntax. Domain checks only run when the corresponding columns are present. Filtered CSV exports prefix formula-like text cells (for example, values beginning with =, +, @, or non-numeric -) with an apostrophe to reduce spreadsheet formula injection risk; this intentionally changes affected exported cell text.
 
 ## Engineering workflow
 

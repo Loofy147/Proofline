@@ -29,7 +29,7 @@ The older live-evidence board's interactive controls were not fully verified in 
 
 ## Residual risks and gaps
 
-- CSV formula injection in exports needs an explicit safe-export policy before customer workflows depend on exported CSV opened in spreadsheet applications.
+- Filtered CSV export now prefixes formula-like text cells with an apostrophe, with a browser regression test for formula-like values. Residual risk remains for spreadsheet-specific parsing and control-character bypasses; review against target applications before production.
 - Browser smoke tests are not a complete WCAG or security audit.
 - Large historical binary snapshots are inventoried but not all individual Git blobs in this commit; the preserved source bundle remains a separate archive pending licensing and repository-size review.
 - No hosted-data security, accounts, customer validation, branch-protection enforcement, or production deployment exists.

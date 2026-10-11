@@ -8,6 +8,7 @@ Do not release solely because CI is green.
 - [ ] Independent check used for high-impact calculations.
 - [ ] Security/privacy review completed for sensitive changes.
 - [ ] No secrets or customer data in diff, logs, fixtures, or artifacts.
+- [ ] CSV exports neutralize formula-like cells and relevant regression tests pass.
 - [ ] Documentation and known limitations updated.
 - [ ] UI/export artifacts inspected when changed.
 

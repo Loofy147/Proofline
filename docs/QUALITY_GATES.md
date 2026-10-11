@@ -21,7 +21,7 @@ Exercise each visible control and download in a browser. Test empty/error states
 
 ## Security and privacy
 
-Keep customer files local by default. Bound file size and row counts. Treat content as untrusted. Define safe CSV export behavior for spreadsheet-formula-like prefixes before using exports with real customer data. Never commit private data or secrets.
+Keep customer files local by default. Bound file size and row counts. Treat content as untrusted. Filtered CSV exports currently prefix formula-like text cells with an apostrophe; keep regression tests for =, +, @, and non-numeric - prefixes, and check spreadsheet-specific behavior before customer production use. Never commit private data or secrets.
 
 ## Release decision
 
