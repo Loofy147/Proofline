@@ -1,0 +1,52 @@
+name: Milestone or external review
+description: Record an independent implementation, evidence, or product assessment.
+title: "[Review]: "
+labels: ["type:review"]
+body:
+  - type: dropdown
+    id: review_type
+    attributes:
+      label: Review type
+      options:
+        - Architecture and implementation
+        - Security and privacy
+        - Evidence and correctness
+        - UX and accessibility
+        - Pilot/customer outcome
+        - Release readiness
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Commit, PR, release, or artifact hash
+      description: Identify exactly what was reviewed.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and acceptance criteria
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Checks actually run and evidence
+      description: Link tests, logs, screenshots, source citations, or calculations. Separate not-run checks.
+    validations:
+      required: true
+  - type: textarea
+    id: findings
+    attributes:
+      label: Findings by severity
+      description: Include reproduction, impact, and a verification step.
+    validations:
+      required: true
+  - type: textarea
+    id: decision
+    attributes:
+      label: Decision and follow-up
+      description: Accept, accept with follow-ups, revise, or stop. Name the next action.
+    validations:
+      required: true
