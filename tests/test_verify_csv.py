@@ -1,4 +1,4 @@
-import json, subprocess, sys, tempfile, unittest
+import csv, json, subprocess, sys, tempfile, unittest
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 class VerifyCsvTests(unittest.TestCase):
@@ -21,4 +21,11 @@ class VerifyCsvTests(unittest.TestCase):
   p,_,_=self.run_cli('name,note\nA,"unclosed\n'); self.assertEqual(p.returncode,2); self.assertIn('Malformed CSV',p.stderr)
  def test_empty_file(self):
   p,_,_=self.run_cli(''); self.assertEqual(p.returncode,2)
+ def test_profile_csv_neutralizes_formula_like_header(self):
+  p,_,out=self.run_cli('=1+1,-12.5\n1,2\n3,4\n5,6\n')
+  self.assertEqual(p.returncode,0,p.stderr)
+  with (out/'sample_column_profile.csv').open('r',newline='',encoding='utf-8-sig') as handle:
+   rows=list(csv.DictReader(handle))
+  self.assertEqual(rows[0]['column'],"'=1+1")
+  self.assertEqual(rows[1]['column'],"-12.5")
 if __name__=='__main__': unittest.main(verbosity=2)
