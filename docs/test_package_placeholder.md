@@ -1,0 +1,1 @@
+This placeholder is superseded by the package integrity test in tests/test_package.py.
