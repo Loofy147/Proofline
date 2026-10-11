@@ -16,7 +16,7 @@ def main():
   with tempfile.TemporaryDirectory() as td:
    f=Path(td)/ev.value.suggested_filename; ev.value.save_as(f); lines=f.read_text(encoding='utf-8').splitlines(); assert len(lines)==31,len(lines); assert all('Atlas' in line for line in lines[1:])
   with tempfile.TemporaryDirectory() as td:
-   f=Path(td)/'formula.csv'; f.write_text('label\n=1+1\n-12.5\n+SUM(1,2)\n',encoding='utf-8')
+   f=Path(td)/'formula.csv'; f.write_text('label\n=1+1\n-12.5\n"+SUM(1,2)"\n',encoding='utf-8')
    page.locator('#csv-file').set_input_files(str(f))
    page.wait_for_function("document.querySelector('#csv-message').textContent.includes('PASS')")
    with page.expect_download() as formula_event: page.locator('#export-csv').click()
