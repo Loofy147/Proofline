@@ -76,6 +76,61 @@ class _BoundedOutput:
             return
 
 
+def extract_runtime_identity(
+    info_payload: dict[str, Any],
+    version_payload: dict[str, Any],
+    *,
+    cgroup_version: str,
+) -> dict[str, Any]:
+    """Extract concrete runtime identity across Podman JSON field variants.
+
+    Podman exposes runtime/conmon details through podman info; podman version
+    supplies the client/API version. Accept lower- and upper-camel variants,
+    but fail closed if identity is incomplete.
+    """
+    host = info_payload.get("host", {})
+    security = host.get("security", {}) if isinstance(host, dict) else {}
+    client = version_payload.get("Client", {})
+    oci = {}
+    conmon = {}
+    if isinstance(host, dict):
+        oci = host.get("ociRuntime") or host.get("OCIRuntime") or host.get("oci_runtime") or {}
+        conmon = host.get("conmon") or host.get("Conmon") or {}
+    if not isinstance(oci, dict):
+        oci = {}
+    if not isinstance(conmon, dict):
+        conmon = {}
+    if not isinstance(client, dict):
+        client = {}
+
+    def first_string(mapping: dict[str, Any], *keys: str) -> str | None:
+        for key in keys:
+            value = mapping.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return None
+
+    identity = {
+        "podman_version": first_string(client, "Version", "version"),
+        "podman_api_version": first_string(client, "APIVersion", "apiVersion", "api_version"),
+        "oci_runtime_name": first_string(oci, "name", "Name", "executable", "Executable"),
+        "oci_runtime_version": first_string(oci, "version", "Version", "package", "Package"),
+        "conmon_version": first_string(conmon, "version", "Version", "package", "Package"),
+        "cgroup_version": cgroup_version,
+        "rootless": security.get("rootless") is True,
+    }
+    required = (
+        "podman_version",
+        "oci_runtime_name",
+        "oci_runtime_version",
+        "conmon_version",
+    )
+    missing = [key for key in required if not identity[key]]
+    if missing or identity["rootless"] is not True or cgroup_version != "v2":
+        raise ValueError(f"runtime identity incomplete: {', '.join(missing) or 'rootless/cgroup-v2 not confirmed'}")
+    return identity
+
+
 class PodmanRootlessRunner:
     def __init__(self, task: dict[str, Any], *, podman_binary: str = "podman") -> None:
         self.task = task
@@ -135,23 +190,9 @@ class PodmanRootlessRunner:
             if version_result.returncode != 0:
                 return RuntimePreflight(False, "Podman version identity could not be captured", self.podman_binary, True)
             version_payload = json.loads(version_result.stdout)
-            client = version_payload.get("Client", {})
-            host_version = version_payload.get("Host", {})
-            oci = host_version.get("OCIRuntime", {}) if isinstance(host_version, dict) else {}
-            conmon = host_version.get("Conmon", {}) if isinstance(host_version, dict) else {}
-            runtime_identity = {
-                "podman_version": client.get("Version") if isinstance(client, dict) else None,
-                "podman_api_version": client.get("APIVersion") if isinstance(client, dict) else None,
-                "oci_runtime_name": oci.get("Name") if isinstance(oci, dict) else None,
-                "oci_runtime_version": oci.get("Version") if isinstance(oci, dict) else None,
-                "conmon_version": (conmon.get("Version") or conmon.get("package")) if isinstance(conmon, dict) else None,
-                "cgroup_version": cgroup_version,
-                "rootless": True,
-            }
-            if not runtime_identity["podman_version"]:
-                return RuntimePreflight(False, "Podman version response lacked a version identifier", self.podman_binary, True)
-        except (OSError, subprocess.SubprocessError, json.JSONDecodeError, AttributeError):
-            return RuntimePreflight(False, "Podman version response could not be validated", self.podman_binary, True)
+            runtime_identity = extract_runtime_identity(payload, version_payload, cgroup_version=cgroup_version)
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError, AttributeError, ValueError):
+            return RuntimePreflight(False, "Podman version/runtime identity could not be validated", self.podman_binary, True)
         try:
             exists = subprocess.run(
                 [self.podman_binary, "image", "exists", self.runtime["image"]],
