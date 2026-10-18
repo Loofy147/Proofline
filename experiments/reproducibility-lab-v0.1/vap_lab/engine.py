@@ -12,7 +12,7 @@ from .canonical import digest_bytes, digest_json, load_json_strict
 from .contract import policy_digest, validate_task
 from .evaluator import aggregate_verdict
 from .runner import PodmanRootlessRunner, load_test_suite
-from .source import snapshot_source, stage_readonly_source
+from .source import SourceSnapshot, snapshot_source, stage_readonly_source
 from .vap import build_vap
 
 RUNNER_VERSION = "reproducibility-lab/0.1.0"
@@ -20,6 +20,12 @@ RUNNER_VERSION = "reproducibility-lab/0.1.0"
 
 def _sha256(data: bytes) -> str:
     return digest_bytes(data)
+
+
+def assert_staged_snapshot_matches(original_digest: str, staged: SourceSnapshot) -> None:
+    """Fail closed if staged bytes differ from the initial submission snapshot."""
+    if staged.digest != original_digest:
+        raise ValueError("submission changed between initial snapshot and staging")
 
 
 def _cleanup_readonly_tree(path: Path) -> None:
@@ -76,12 +82,15 @@ def run_task(task_path: str | Path, submission_dir: str | Path, test_suite_path:
         parent = Path(tempfile.mkdtemp(prefix="vap-stage-parent-"))
         staged = parent / "source"
         try:
-            stage_readonly_source(
+            staged_snapshot = stage_readonly_source(
                 submission_dir,
                 staged,
                 max_bytes=limits["max_source_bytes"],
                 max_files=limits["max_source_files"],
             )
+            # Guard against a source changing between the initial digest and
+            # staging. The VAP must describe the exact bytes that were executed.
+            assert_staged_snapshot_matches(source.digest, staged_snapshot)
             attempted = 0
             for index, case in enumerate(suite["cases"]):
                 inp = case["stdin"].encode("utf-8")
