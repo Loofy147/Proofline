@@ -4,92 +4,302 @@
   "title": "Verifiable Attestation Package v0.1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "run_id", "timestamp_utc", "verdict_core", "verdict_digest", "telemetry", "attestation"],
+  "required": [
+    "schema_version",
+    "run_id",
+    "timestamp_utc",
+    "verdict_core",
+    "verdict_digest",
+    "telemetry",
+    "attestation"
+  ],
   "properties": {
-    "schema_version": {"const": "vap.attestation.v0.1"},
-    "run_id": {"type": "string", "format": "uuid"},
-    "timestamp_utc": {"type": "integer", "minimum": 0},
-    "verdict_digest": {"$ref": "#/$defs/digest"},
-    "verdict_core": {"$ref": "#/$defs/verdictCore"},
-    "telemetry": {"$ref": "#/$defs/telemetry"},
+    "schema_version": {
+      "const": "vap.attestation.v0.1"
+    },
+    "run_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "timestamp_utc": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "verdict_digest": {
+      "$ref": "#/$defs/digest"
+    },
+    "verdict_core": {
+      "$ref": "#/$defs/verdictCore"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/telemetry"
+    },
     "attestation": {
-      "type": "object", "additionalProperties": false,
-      "required": ["status", "algorithm", "signer", "signature"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "algorithm",
+        "signer",
+        "signature"
+      ],
       "properties": {
-        "status": {"const": "UNSIGNED_LOCAL_PROTOTYPE"},
-        "algorithm": {"type": "null"},
-        "signer": {"type": "null"},
-        "signature": {"type": "null"}
+        "status": {
+          "const": "UNSIGNED_LOCAL_PROTOTYPE"
+        },
+        "algorithm": {
+          "type": "null"
+        },
+        "signer": {
+          "type": "null"
+        },
+        "signature": {
+          "type": "null"
+        }
       }
     }
   },
   "$defs": {
-    "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
-    "status": {"enum": ["PASS", "FAIL_TESTS", "POLICY_VIOLATION", "RESOURCE_EXHAUSTED", "INFRASTRUCTURE_FAILURE", "INVALID_SUBMISSION"]},
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL_TESTS",
+        "POLICY_VIOLATION",
+        "RESOURCE_EXHAUSTED",
+        "INFRASTRUCTURE_FAILURE",
+        "INVALID_SUBMISSION"
+      ]
+    },
     "verdictCore": {
-      "type": "object", "additionalProperties": false,
-      "required": ["profile", "task_id", "task_digest", "source_digest", "source_file_count", "source_total_bytes", "test_suite_digest", "runtime_image", "runner_version", "runtime_identity_digest", "policy_digest", "verdict", "reason", "cases_total", "cases_attempted", "cases_passed", "case_results"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "profile",
+        "task_id",
+        "task_digest",
+        "source_digest",
+        "source_file_count",
+        "source_total_bytes",
+        "test_suite_digest",
+        "runtime_image",
+        "runner_version",
+        "runtime_identity_digest",
+        "policy_digest",
+        "verdict",
+        "reason",
+        "cases_total",
+        "cases_attempted",
+        "cases_passed",
+        "case_results"
+      ],
       "properties": {
-        "profile": {"const": "vap.verdict-core.v0.1"},
-        "task_id": {"type": "string"},
-        "task_digest": {"$ref": "#/$defs/digest"},
-        "source_digest": {"$ref": "#/$defs/digest"},
-        "source_file_count": {"type": "integer", "minimum": 1},
-        "source_total_bytes": {"type": "integer", "minimum": 0},
-        "test_suite_digest": {"$ref": "#/$defs/digest"},
-        "runtime_image": {"type": "string", "pattern": "^[A-Za-z0-9._/:+-]+@sha256:[0-9a-f]{64}$"},
-        "runner_version": {"type": "string"},
-        "runtime_identity_digest": {"oneOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
-        "policy_digest": {"$ref": "#/$defs/digest"},
-        "verdict": {"$ref": "#/$defs/status"},
-        "reason": {"type": "string"},
-        "cases_total": {"type": "integer", "minimum": 1},
-        "cases_attempted": {"type": "integer", "minimum": 0},
-        "cases_passed": {"type": "integer", "minimum": 0},
+        "profile": {
+          "const": "vap.verdict-core.v0.1"
+        },
+        "task_id": {
+          "type": "string"
+        },
+        "task_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "source_file_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "source_total_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "test_suite_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "runtime_image": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._/:+-]+@sha256:[0-9a-f]{64}$"
+        },
+        "runner_version": {
+          "type": "string"
+        },
+        "runtime_identity_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/digest"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "policy_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "verdict": {
+          "$ref": "#/$defs/status"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "cases_total": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "cases_attempted": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "cases_passed": {
+          "type": "integer",
+          "minimum": 0
+        },
         "case_results": {
           "type": "array",
-          "items": {"$ref": "#/$defs/caseResult"}
+          "items": {
+            "$ref": "#/$defs/caseResult"
+          }
         }
       }
     },
     "caseResult": {
-      "type": "object", "additionalProperties": false,
-      "required": ["index", "status", "reason", "exit_code", "stdout_digest", "stderr_digest"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "index",
+        "status",
+        "reason",
+        "exit_code",
+        "stdout_digest",
+        "stderr_digest"
+      ],
       "properties": {
-        "index": {"type": "integer", "minimum": 0},
-        "status": {"$ref": "#/$defs/status"},
-        "reason": {"type": "string"},
-        "exit_code": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-        "stdout_digest": {"$ref": "#/$defs/digest"},
-        "stderr_digest": {"$ref": "#/$defs/digest"}
+        "index": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "exit_code": {
+          "oneOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stdout_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "stderr_digest": {
+          "$ref": "#/$defs/digest"
+        }
       }
     },
     "telemetry": {
-      "type": "object", "additionalProperties": false,
-      "required": ["total_wall_clock_ms", "runtime_preflight", "case_runs", "host_kernel", "target_cpu_time_ns", "target_peak_memory_bytes", "resource_measurement_status"],
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "total_wall_clock_ms",
+        "runtime_preflight",
+        "case_runs",
+        "host_kernel",
+        "target_cpu_time_ns",
+        "target_peak_memory_bytes",
+        "resource_measurement_status"
+      ],
       "properties": {
-        "total_wall_clock_ms": {"type": "integer", "minimum": 0},
+        "total_wall_clock_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
         "runtime_preflight": {
-          "type": "object", "additionalProperties": false,
-          "required": ["available", "message", "rootless_confirmed", "runtime_identity"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "available",
+            "message",
+            "rootless_confirmed",
+            "runtime_identity"
+          ],
           "properties": {
-            "available": {"type": "boolean"},
-            "message": {"type": "string"},
-            "rootless_confirmed": {"oneOf": [{"type": "boolean"}, {"type": "null"}]},
+            "available": {
+              "type": "boolean"
+            },
+            "message": {
+              "type": "string"
+            },
+            "rootless_confirmed": {
+              "oneOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
             "runtime_identity": {
               "oneOf": [
-                {"type": "null"},
                 {
-                  "type": "object", "additionalProperties": false,
-                  "required": ["podman_version", "podman_api_version", "oci_runtime_name", "oci_runtime_version", "conmon_version", "cgroup_version", "rootless"],
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "podman_version",
+                    "podman_api_version",
+                    "oci_runtime_name",
+                    "oci_runtime_version",
+                    "conmon_version",
+                    "cgroup_version",
+                    "rootless"
+                  ],
                   "properties": {
-                    "podman_version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "podman_api_version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "oci_runtime_name": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "oci_runtime_version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "conmon_version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "cgroup_version": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-                    "rootless": {"type": "boolean"}
+                    "podman_version": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "podman_api_version": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "oci_runtime_name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "oci_runtime_version": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "conmon_version": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "cgroup_version": {
+                      "const": "v2"
+                    },
+                    "rootless": {
+                      "const": true
+                    }
                   }
                 }
               ]
@@ -99,27 +309,180 @@
         "case_runs": {
           "type": "array",
           "items": {
-            "type": "object", "additionalProperties": false,
-            "required": ["index", "wall_clock_ms", "captured_stdout_bytes", "captured_stderr_bytes", "total_observed_output_bytes", "container_started", "oom_killed", "container_exit_code", "cpu_time_ns", "peak_memory_bytes", "resource_measurement"],
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "index",
+              "wall_clock_ms",
+              "captured_stdout_bytes",
+              "captured_stderr_bytes",
+              "total_observed_output_bytes",
+              "container_started",
+              "oom_killed",
+              "container_exit_code",
+              "cpu_time_ns",
+              "peak_memory_bytes",
+              "resource_measurement"
+            ],
             "properties": {
-              "index": {"type": "integer", "minimum": 0},
-              "wall_clock_ms": {"type": "integer", "minimum": 0},
-              "captured_stdout_bytes": {"type": "integer", "minimum": 0},
-              "captured_stderr_bytes": {"type": "integer", "minimum": 0},
-              "total_observed_output_bytes": {"type": "integer", "minimum": 0},
-              "container_started": {"type": "boolean"},
-              "oom_killed": {"oneOf": [{"type": "boolean"}, {"type": "null"}]},
-              "container_exit_code": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-              "cpu_time_ns": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-              "peak_memory_bytes": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-              "resource_measurement": {"const": "NOT_COLLECTED_IN_V0.1"}
+              "index": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "wall_clock_ms": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "captured_stdout_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "captured_stderr_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "total_observed_output_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "container_started": {
+                "type": "boolean"
+              },
+              "oom_killed": {
+                "oneOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "container_exit_code": {
+                "oneOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "cpu_time_ns": {
+                "type": "null"
+              },
+              "peak_memory_bytes": {
+                "type": "null"
+              },
+              "resource_measurement": {
+                "const": "NOT_COLLECTED_IN_V0.1"
+              }
             }
           }
         },
-        "host_kernel": {"oneOf": [{"type": "string"}, {"type": "null"}]},
-        "target_cpu_time_ns": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-        "target_peak_memory_bytes": {"oneOf": [{"type": "integer"}, {"type": "null"}]},
-        "resource_measurement_status": {"const": "NOT_COLLECTED_IN_V0.1"}
+        "host_kernel": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target_cpu_time_ns": {
+          "type": "null"
+        },
+        "target_peak_memory_bytes": {
+          "type": "null"
+        },
+        "resource_measurement_status": {
+          "const": "NOT_COLLECTED_IN_V0.1"
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "runtime_preflight": {
+                  "properties": {
+                    "available": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "available"
+                  ]
+                }
+              },
+              "required": [
+                "runtime_preflight"
+              ]
+            },
+            "then": {
+              "properties": {
+                "runtime_preflight": {
+                  "properties": {
+                    "rootless_confirmed": {
+                      "const": true
+                    },
+                    "runtime_identity": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "podman_version",
+                        "podman_api_version",
+                        "oci_runtime_name",
+                        "oci_runtime_version",
+                        "conmon_version",
+                        "cgroup_version",
+                        "rootless"
+                      ],
+                      "properties": {
+                        "podman_version": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "podman_api_version": {
+                          "oneOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "oci_runtime_name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "oci_runtime_version": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "conmon_version": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "cgroup_version": {
+                          "const": "v2"
+                        },
+                        "rootless": {
+                          "const": true
+                        }
+                      }
+                    }
+                  },
+                  "required": [
+                    "rootless_confirmed",
+                    "runtime_identity"
+                  ]
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }

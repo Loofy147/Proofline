@@ -53,7 +53,7 @@ Stderr text, self-reports, and non-zero exit status are not by themselves eviden
 
 ## Telemetry and attestation
 
-Telemetry is descriptive. It may include elapsed time, observed output sizes, container start/exit/OOM metadata, host kernel, and metric availability. Unavailable CPU and peak-memory measurements must be null and marked not collected.
+Telemetry is descriptive. It may include elapsed time, observed output sizes, container start/exit/OOM metadata, host kernel, and metric availability. Unavailable CPU and peak-memory measurements must be null and marked not collected. The verifier checks required fields and counter consistency, requires the reported runtime identity to hash to the value in the verdict core, and rejects non-null CPU-time or peak-memory values under v0.1. Because telemetry is intentionally outside the verdict digest and the envelope is unsigned, this is consistency validation—not tamper evidence or authenticated telemetry.
 
 The v0.1 envelope is unsigned and explicitly marked UNSIGNED_LOCAL_PROTOTYPE. A future signed profile must define exact signed bytes, algorithm, key rotation/revocation, freshness, replay protection, task/policy binding, signer isolation, and independent receipt validation.
 
@@ -66,3 +66,4 @@ The v0.1 envelope is unsigned and explicitly marked UNSIGNED_LOCAL_PROTOTYPE. A 
 - Stderr phrases alone cannot become POLICY_VIOLATION.
 - Missing runtime or image cannot fall back to host execution.
 - Telemetry and timestamps do not alter the verdict digest; judgment-bearing input changes do.
+- Malformed telemetry, missing case telemetry, altered runtime identity, and claimed-but-uncollected resource metrics are rejected.

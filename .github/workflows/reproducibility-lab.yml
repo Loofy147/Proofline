@@ -41,6 +41,28 @@ jobs:
           print("task profile and test-suite commitment: PASS")
           PY
 
+      - name: Validate JSON schema and VAP metric contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          for name in ("task.schema.json", "tests.schema.json", "vap.schema.json"):
+              with Path("schemas", name).open(encoding="utf-8") as handle:
+                  json.load(handle)
+          schema = json.loads(Path("schemas/vap.schema.json").read_text(encoding="utf-8"))
+          telemetry = schema["$defs"]["telemetry"]["properties"]
+          assert telemetry["target_cpu_time_ns"] == {"type": "null"}
+          assert telemetry["target_peak_memory_bytes"] == {"type": "null"}
+          cases = telemetry["case_runs"]["items"]["properties"]
+          assert cases["cpu_time_ns"] == {"type": "null"}
+          assert cases["peak_memory_bytes"] == {"type": "null"}
+          identity = telemetry["runtime_preflight"]["properties"]["runtime_identity"]["oneOf"][1]["properties"]
+          assert identity["cgroup_version"] == {"const": "v2"}
+          assert identity["rootless"] == {"const": True}
+          print("JSON schema syntax and telemetry-v0.1 constraints: PASS")
+          PY
+
   sandbox-integration:
     runs-on: ubuntu-24.04
     timeout-minutes: 15

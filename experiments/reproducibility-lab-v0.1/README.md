@@ -15,6 +15,8 @@ Test whether a software submission can be evaluated in a bounded, content-addres
 - Container execution without network, with a read-only root filesystem, dropped capabilities, no-new-privileges, CPU/memory/PID limits, and bounded stdin/stdout/stderr.
 - Expected outputs are retained by the host harness and never mounted in the candidate container.
 - Verdict digest excludes timestamps and variable telemetry. It binds task/source/test/policy commitments and the runtime identity.
+- VAP verification validates telemetry shape and consistency with the committed runtime-identity digest; the envelope remains unsigned, so telemetry is not tamper-proof.
+- Dedicated Linux CI executes seven real rootless-Podman scenarios against an OCI image resolved and pinned by digest.
 - VAP integrity validation and fail-closed behavior tests.
 
 ## Not implemented
@@ -40,6 +42,8 @@ From this directory:
     python3 -m unittest discover -s tests -v
     python3 -m vap_lab.cli preflight --task examples/task.demo.json
     python3 -m vap_lab.cli verify-vap --vap evidence/local-run.vap.json
+    # CI-only adversarial sandbox suite (requires rootless Podman + cgroup v2)
+    VAP_TEST_IMAGE='docker.io/library/python@sha256:...' python3 tests/podman_integration.py
 
 The preflight command is expected to fail when Podman, cgroup v2, or the pinned example image is unavailable. That is an infrastructure status, not a verdict on the candidate.
 
