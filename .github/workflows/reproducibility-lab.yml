@@ -47,7 +47,7 @@ jobs:
           import json
           from pathlib import Path
 
-          for name in ("task.schema.json", "tests.schema.json", "vap.schema.json"):
+          for name in ("task.schema.json", "tests.schema.json", "vap.schema.json", "vap-v0.2.schema.json"):
               with Path("schemas", name).open(encoding="utf-8") as handle:
                   json.load(handle)
           schema = json.loads(Path("schemas/vap.schema.json").read_text(encoding="utf-8"))
@@ -60,7 +60,20 @@ jobs:
           identity = telemetry["runtime_preflight"]["properties"]["runtime_identity"]["oneOf"][1]["properties"]
           assert identity["cgroup_version"] == {"const": "v2"}
           assert identity["rootless"] == {"const": True}
-          print("JSON schema syntax and telemetry-v0.1 constraints: PASS")
+
+          schema_v2 = json.loads(Path("schemas/vap-v0.2.schema.json").read_text(encoding="utf-8"))
+          assert schema_v2["properties"]["schema_version"] == {"const": "vap.attestation.v0.2"}
+          assert schema_v2["$defs"]["verdictCore"]["properties"]["profile"] == {"const": "vap.verdict-core.v0.2"}
+          telemetry_v2 = schema_v2["$defs"]["telemetry"]
+          assert "allOf" in telemetry_v2 and "allOf" not in telemetry_v2["properties"]
+          for field in ("target_cpu_time_ns", "target_peak_memory_bytes"):
+              assert telemetry_v2["properties"][field]["oneOf"] == [
+                  {"type": "integer", "minimum": 0}, {"type": "null"}
+              ]
+          assert telemetry_v2["properties"]["resource_measurement_status"]["enum"] == [
+              "COLLECTED", "PARTIAL", "UNAVAILABLE", "NOT_RUN"
+          ]
+          print("VAP v0.1 null-only contract and VAP v0.2 cgroup-metric schema: PASS")
           PY
 
   sandbox-integration:

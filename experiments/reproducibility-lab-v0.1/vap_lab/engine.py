@@ -15,7 +15,7 @@ from .runner import PodmanRootlessRunner, load_test_suite
 from .source import SourceSnapshot, snapshot_source, stage_readonly_source
 from .vap import build_vap
 
-RUNNER_VERSION = "reproducibility-lab/0.1.0"
+RUNNER_VERSION = "reproducibility-lab/0.2.0"
 
 
 def _sha256(data: bytes) -> str:
@@ -26,6 +26,34 @@ def assert_staged_snapshot_matches(original_digest: str, staged: SourceSnapshot)
     """Fail closed if staged bytes differ from the initial submission snapshot."""
     if staged.digest != original_digest:
         raise ValueError("submission changed between initial snapshot and staging")
+
+
+def _aggregate_resource_metrics(case_runs: list[dict[str, Any]]) -> tuple[str, int | None, int | None]:
+    """Aggregate measurements only when every attempted case has both counters."""
+    if not case_runs:
+        return "NOT_RUN", None, None
+    statuses = [row.get("resource_measurement") for row in case_runs]
+    if all(status == "NOT_RUN" for status in statuses):
+        return "NOT_RUN", None, None
+    fully_measured = all(
+        row.get("resource_measurement") == "CGROUP_V2_MEASURED"
+        and row.get("cpu_time_ns") is not None
+        and row.get("peak_memory_bytes") is not None
+        for row in case_runs
+    )
+    if fully_measured:
+        return (
+            "COLLECTED",
+            sum(row["cpu_time_ns"] for row in case_runs),
+            max(row["peak_memory_bytes"] for row in case_runs),
+        )
+    has_any_metric = any(
+        row.get("cpu_time_ns") is not None or row.get("peak_memory_bytes") is not None
+        for row in case_runs
+    )
+    if has_any_metric:
+        return "PARTIAL", None, None
+    return "UNAVAILABLE", None, None
 
 
 def _cleanup_readonly_tree(path: Path) -> None:
@@ -104,7 +132,7 @@ def run_task(task_path: str | Path, submission_dir: str | Path, test_suite_path:
                         "stdout_digest": _sha256(b""),
                         "stderr_digest": _sha256(b""),
                     })
-                    telemetry_cases.append({"index": index, "wall_clock_ms": 0, "captured_stdout_bytes": 0, "captured_stderr_bytes": 0, "total_observed_output_bytes": 0, "container_started": False, "oom_killed": None, "container_exit_code": None, "cpu_time_ns": None, "peak_memory_bytes": None, "resource_measurement": "NOT_COLLECTED_IN_V0.1"})
+                    telemetry_cases.append({"index": index, "wall_clock_ms": 0, "captured_stdout_bytes": 0, "captured_stderr_bytes": 0, "total_observed_output_bytes": 0, "container_started": False, "oom_killed": None, "container_exit_code": None, "cpu_time_ns": None, "peak_memory_bytes": None, "resource_measurement": "NOT_RUN"})
                     attempted += 1
                     break
                 result = runner.run_case(staged, inp, expected)
@@ -141,7 +169,7 @@ def run_task(task_path: str | Path, submission_dir: str | Path, test_suite_path:
 
     wall_total_ms = (time.monotonic_ns() - total_started) // 1_000_000
     core = {
-        "profile": "vap.verdict-core.v0.1",
+        "profile": "vap.verdict-core.v0.2",
         "task_id": task["task_id"],
         "task_digest": task_digest,
         "source_digest": source.digest,
@@ -159,6 +187,7 @@ def run_task(task_path: str | Path, submission_dir: str | Path, test_suite_path:
         "cases_passed": sum(1 for row in results if row["status"] == "PASS"),
         "case_results": results,
     }
+    resource_status, target_cpu_time_ns, target_peak_memory_bytes = _aggregate_resource_metrics(telemetry_cases)
     telemetry = {
         "total_wall_clock_ms": int(wall_total_ms),
         "runtime_preflight": {
@@ -169,9 +198,9 @@ def run_task(task_path: str | Path, submission_dir: str | Path, test_suite_path:
         },
         "case_runs": telemetry_cases,
         "host_kernel": os.uname().release if hasattr(os, "uname") else None,
-        "target_cpu_time_ns": None,
-        "target_peak_memory_bytes": None,
-        "resource_measurement_status": "NOT_COLLECTED_IN_V0.1",
+        "target_cpu_time_ns": target_cpu_time_ns,
+        "target_peak_memory_bytes": target_peak_memory_bytes,
+        "resource_measurement_status": resource_status,
     }
     return build_vap(core, telemetry)
 

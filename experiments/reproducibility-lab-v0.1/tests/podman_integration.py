@@ -50,6 +50,7 @@ def run_scenario(
     expected_verdict: str,
     limit_overrides: dict[str, Any] | None = None,
     proxy_sentinel: bool = False,
+    require_resource_measurement: bool = False,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix=f"vap-{task_id}-") as temp:
         root = Path(temp)
@@ -115,6 +116,16 @@ def run_scenario(
             raise AssertionError(f"{task_id}: original submission changed during execution")
         case = core["case_results"][0] if core["case_results"] else {}
         telemetry = vap.get("telemetry", {}).get("case_runs", [])
+        if require_resource_measurement:
+            metric = telemetry[0] if telemetry else {}
+            cpu_time_ns = metric.get("cpu_time_ns")
+            peak_memory_bytes = metric.get("peak_memory_bytes")
+            if metric.get("resource_measurement") != "CGROUP_V2_MEASURED":
+                raise AssertionError(f"{task_id}: cgroup v2 metrics were not fully measured: {metric}")
+            if not isinstance(cpu_time_ns, int) or cpu_time_ns <= 0:
+                raise AssertionError(f"{task_id}: missing positive cgroup CPU-time counter: {metric}")
+            if not isinstance(peak_memory_bytes, int) or peak_memory_bytes < 32 * 1024 * 1024:
+                raise AssertionError(f"{task_id}: memory.peak below the 32 MiB allocation: {metric}")
         return {
             "task_id": task_id,
             "expected_verdict": expected_verdict,
@@ -124,6 +135,9 @@ def run_scenario(
             "runtime_image": core["runtime_image"],
             "vap_valid": True,
             "original_unchanged": True,
+            "resource_measurement": telemetry[0].get("resource_measurement") if telemetry else "NOT_RUN",
+            "cpu_time_ns": telemetry[0].get("cpu_time_ns") if telemetry else None,
+            "peak_memory_bytes": telemetry[0].get("peak_memory_bytes") if telemetry else None,
             "vap": vap,
         }
 
@@ -225,6 +239,25 @@ def main() -> int:
         expected_stdout="done\n",
         expected_verdict="RESOURCE_EXHAUSTED",
         limit_overrides={"max_output_bytes": 4096},
+    ))
+
+    results.append(run_scenario(
+        image=image,
+        task_id="podman-resource-metrics-001",
+        source=(
+            "import time\n"
+            "size = 32 * 1024 * 1024\n"
+            "data = bytearray(size)\n"
+            "for offset in range(0, size, 4096):\n"
+            "    data[offset] = 1\n"
+            "time.sleep(0.5)\n"
+            "print(len(data))\n"
+        ),
+        stdin="",
+        expected_stdout="33554432\n",
+        expected_verdict="PASS",
+        limit_overrides={"timeout_seconds": 4},
+        require_resource_measurement=True,
     ))
 
     report = {
