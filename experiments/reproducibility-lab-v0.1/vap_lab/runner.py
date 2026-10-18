@@ -210,6 +210,7 @@ class PodmanRootlessRunner:
             "--name", name,
             "--label", f"vap.run_id={name}",
             "--network=none",
+            "--http-proxy=false",
             "--no-hosts",
             "--read-only",
             "--read-only-tmpfs=false",
