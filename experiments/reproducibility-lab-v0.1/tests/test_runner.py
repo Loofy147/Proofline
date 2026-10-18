@@ -20,6 +20,7 @@ class PodmanCommandTests(unittest.TestCase):
         self.assertIn("registry.example/python@sha256:" + "a" * 64, command)
         self.assertEqual(command[command.index("--entrypoint") + 1], "python3")
         self.assertIn("--http-proxy=false", command)
+        self.assertIn("--interactive", command)
 
     def test_command_mounts_only_the_submission_tree(self):
         command = self.runner._command(Path("/tmp/vap-stage"), "vap-test-run")
