@@ -51,9 +51,15 @@ Timestamp, run UUID, and execution telemetry are outside this digest.
 
 Stderr text, self-reports, and non-zero exit status are not by themselves evidence of a security violation.
 
+## Cross-runner replay evidence
+
+The CI gate runs the same seven committed scenarios on two separate GitHub-hosted Ubuntu 24.04 workers. Each worker emits VAP documents; a separate job independently runs the VAP verifier and compares the complete verdict core field-by-field. Run timestamps, UUIDs, and descriptive telemetry are outside the verdict core and do not cause a mismatch. Missing scenarios, malformed/tampered VAPs, changed inputs, changed runtime identity, and different case outcomes fail the comparison.
+
+This is cross-worker replay inside one CI provider/control plane. It is not independent-provider attestation, does not detect shared implementation defects, and cannot establish that the runner or its artifact channel is trustworthy against the provider itself.
+
 ## Telemetry and attestation
 
-Telemetry is descriptive. It may include elapsed time, observed output sizes, container start/exit/OOM metadata, host kernel, and metric availability. Unavailable CPU and peak-memory measurements must be null and marked not collected. The verifier checks required fields and counter consistency, requires the reported runtime identity to hash to the value in the verdict core, and rejects non-null CPU-time or peak-memory values under v0.1. Because telemetry is intentionally outside the verdict digest and the envelope is unsigned, this is consistency validation—not tamper evidence or authenticated telemetry.
+Telemetry is descriptive. It may include elapsed time, observed output sizes, container start/exit/OOM metadata, host kernel, and metric availability. Unavailable CPU and peak-memory measurements must be null and marked not collected. The verifier checks required fields and counter consistency, requires the reported runtime identity to hash to the value in the verdict core, and rejects non-null CPU-time or peak-memory values under v0.1. Because telemetry is intentionally outside the verdict digest and the envelope is unsigned, this is consistency validation—not tamper evidence or authenticated telemetry. Cross-worker replay agreement does not authenticate the telemetry or make the VAP suitable for settlement.
 
 The v0.1 envelope is unsigned and explicitly marked UNSIGNED_LOCAL_PROTOTYPE. A future signed profile must define exact signed bytes, algorithm, key rotation/revocation, freshness, replay protection, task/policy binding, signer isolation, and independent receipt validation.
 

@@ -124,6 +124,7 @@ def run_scenario(
             "runtime_image": core["runtime_image"],
             "vap_valid": True,
             "original_unchanged": True,
+            "vap": vap,
         }
 
 
@@ -226,7 +227,20 @@ def main() -> int:
         limit_overrides={"max_output_bytes": 4096},
     ))
 
-    print(json.dumps({"status": "PASS", "scenario_count": len(results), "results": results}, indent=2))
+    report = {
+        "schema_version": "vap.cross-runner-replay-report.v0.1",
+        "runner_label": os.environ.get("VAP_REPLAY_LABEL", "local"),
+        "results": [{"task_id": item["task_id"], "vap": item["vap"]} for item in results],
+    }
+    report_path = os.environ.get("VAP_REPLAY_REPORT")
+    if report_path:
+        Path(report_path).write_text(
+            json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            encoding="utf-8",
+        )
+    # Keep the console summary compact; full, verifier-checked VAPs go to the artifact.
+    console_results = [{key: value for key, value in item.items() if key != "vap"} for item in results]
+    print(json.dumps({"status": "PASS", "scenario_count": len(results), "runner_label": report["runner_label"], "results": console_results}, indent=2))
     return 0
 
 
