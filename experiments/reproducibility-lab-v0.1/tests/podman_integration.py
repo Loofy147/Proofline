@@ -235,7 +235,7 @@ def main() -> int:
     report_path = os.environ.get("VAP_REPLAY_REPORT")
     if report_path:
         Path(report_path).write_text(
-            json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\\n",
+            json.dumps(report, ensure_ascii=False, sort_keys=True, indent=2) + "\n",
             encoding="utf-8",
         )
     # Keep the console summary compact; full, verifier-checked VAPs go to the artifact.
