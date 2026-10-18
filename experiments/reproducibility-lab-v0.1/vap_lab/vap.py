@@ -36,6 +36,115 @@ def build_vap(core: dict[str, Any], telemetry: dict[str, Any], *, timestamp_utc:
     }
 
 
+def _is_nonnegative_int(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _valid_telemetry(telemetry: Any, core: dict[str, Any]) -> bool:
+    """Validate telemetry schema and consistency with the verdict core.
+
+    Telemetry is intentionally excluded from the verdict digest and remains
+    unauthenticated in the unsigned v0.1 envelope. This check rejects malformed
+    or internally inconsistent records; it does not make telemetry tamper-proof.
+    """
+    telemetry_fields = {
+        "total_wall_clock_ms", "runtime_preflight", "case_runs", "host_kernel",
+        "target_cpu_time_ns", "target_peak_memory_bytes", "resource_measurement_status",
+    }
+    if not isinstance(telemetry, dict) or set(telemetry) != telemetry_fields:
+        return False
+    if not _is_nonnegative_int(telemetry.get("total_wall_clock_ms")):
+        return False
+    if telemetry.get("host_kernel") is not None and not isinstance(telemetry.get("host_kernel"), str):
+        return False
+    for field in ("target_cpu_time_ns", "target_peak_memory_bytes"):
+        value = telemetry.get(field)
+        if value is not None and not _is_nonnegative_int(value):
+            return False
+    if telemetry.get("resource_measurement_status") != "NOT_COLLECTED_IN_V0.1":
+        return False
+    if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+        return False
+
+    preflight = telemetry.get("runtime_preflight")
+    preflight_fields = {"available", "message", "rootless_confirmed", "runtime_identity"}
+    if not isinstance(preflight, dict) or set(preflight) != preflight_fields:
+        return False
+    if not isinstance(preflight.get("available"), bool) or not isinstance(preflight.get("message"), str):
+        return False
+    rootless_confirmed = preflight.get("rootless_confirmed")
+    if rootless_confirmed is not None and not isinstance(rootless_confirmed, bool):
+        return False
+
+    runtime_identity = preflight.get("runtime_identity")
+    if runtime_identity is None:
+        if core.get("runtime_identity_digest") is not None:
+            return False
+    else:
+        identity_fields = {
+            "podman_version", "podman_api_version", "oci_runtime_name",
+            "oci_runtime_version", "conmon_version", "cgroup_version", "rootless",
+        }
+        if not isinstance(runtime_identity, dict) or set(runtime_identity) != identity_fields:
+            return False
+        for field in ("podman_version", "oci_runtime_name", "oci_runtime_version", "conmon_version", "cgroup_version"):
+            if not isinstance(runtime_identity.get(field), str) or not runtime_identity[field]:
+                return False
+        api_version = runtime_identity.get("podman_api_version")
+        if api_version is not None and not isinstance(api_version, str):
+            return False
+        if not isinstance(runtime_identity.get("rootless"), bool):
+            return False
+        try:
+            if digest_json(runtime_identity) != core.get("runtime_identity_digest"):
+                return False
+        except (TypeError, ValueError):
+            return False
+    if preflight["available"]:
+        if rootless_confirmed is not True or runtime_identity is None:
+            return False
+        if runtime_identity.get("rootless") is not True or runtime_identity.get("cgroup_version") != "v2":
+            return False
+    elif core.get("cases_attempted") != 0:
+        return False
+
+    case_runs = telemetry.get("case_runs")
+    if not isinstance(case_runs, list) or len(case_runs) != core.get("cases_attempted"):
+        return False
+    case_telemetry_fields = {
+        "index", "wall_clock_ms", "captured_stdout_bytes", "captured_stderr_bytes",
+        "total_observed_output_bytes", "container_started", "oom_killed",
+        "container_exit_code", "cpu_time_ns", "peak_memory_bytes", "resource_measurement",
+    }
+    for index, item in enumerate(case_runs):
+        if not isinstance(item, dict) or set(item) != case_telemetry_fields:
+            return False
+        if item.get("index") != index:
+            return False
+        for field in ("wall_clock_ms", "captured_stdout_bytes", "captured_stderr_bytes", "total_observed_output_bytes"):
+            if not _is_nonnegative_int(item.get(field)):
+                return False
+        if item["captured_stdout_bytes"] + item["captured_stderr_bytes"] > item["total_observed_output_bytes"]:
+            return False
+        if not isinstance(item.get("container_started"), bool):
+            return False
+        oom_killed = item.get("oom_killed")
+        if oom_killed is not None and not isinstance(oom_killed, bool):
+            return False
+        exit_code = item.get("container_exit_code")
+        if exit_code is not None and (not isinstance(exit_code, int) or isinstance(exit_code, bool)):
+            return False
+        for field in ("cpu_time_ns", "peak_memory_bytes"):
+            value = item.get(field)
+            if value is not None and not _is_nonnegative_int(value):
+                return False
+            if value is not None:
+                return False
+        if item.get("resource_measurement") != "NOT_COLLECTED_IN_V0.1":
+            return False
+    return True
+
+
 def verify_vap_document(vap: dict[str, Any]) -> bool:
     """Validate the v0.1 envelope and recompute its verdict digest.
 
@@ -102,6 +211,8 @@ def verify_vap_document(vap: dict[str, Any]) -> bool:
             if not isinstance(value, str) or len(value) != 71 or not value.startswith("sha256:") or any(ch not in "0123456789abcdef" for ch in value[7:]):
                 return False
     if sum(1 for case in case_results if case["status"] == "PASS") != core["cases_passed"]:
+        return False
+    if not _valid_telemetry(vap.get("telemetry"), core):
         return False
     if core["cases_attempted"] == 0:
         if core["verdict"] != "INFRASTRUCTURE_FAILURE" or case_results:
