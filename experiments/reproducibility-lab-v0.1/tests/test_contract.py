@@ -85,6 +85,24 @@ class TaskContractTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_task(task)
 
+    def test_busybox_shell_applet_is_rejected(self):
+        task = json.loads(json.dumps(VALID_TASK))
+        task["runtime_profile"]["command"] = ["busybox", "sh", "-c", "python3 /workspace/solution.py"]
+        with self.assertRaises(ValueError):
+            validate_task(task)
+
+    def test_env_shell_launcher_is_rejected(self):
+        task = json.loads(json.dumps(VALID_TASK))
+        task["runtime_profile"]["command"] = ["env", "bash", "-c", "python3 /workspace/solution.py"]
+        with self.assertRaises(ValueError):
+            validate_task(task)
+
+    def test_env_split_string_shell_launcher_is_rejected(self):
+        task = json.loads(json.dumps(VALID_TASK))
+        task["runtime_profile"]["command"] = ["env", "-S", "bash -c 'python3 /workspace/solution.py'"]
+        with self.assertRaises(ValueError):
+            validate_task(task)
+
     def test_preflight_fails_closed_without_podman(self):
         runner = PodmanRootlessRunner(VALID_TASK, podman_binary="/no/such/podman")
         self.assertFalse(runner.preflight().available)
