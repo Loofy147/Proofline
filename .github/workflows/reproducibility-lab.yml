@@ -64,6 +64,11 @@ jobs:
           PY
 
   sandbox-integration:
+    strategy:
+      fail-fast: false
+      matrix:
+        replay: [runner-a, runner-b]
+    name: sandbox-integration (${{ matrix.replay }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
@@ -110,24 +115,50 @@ jobs:
           assert host.get("cgroupVersion") == "v2", f"cgroup v2 not confirmed: {host.get('cgroupVersion')}"
           print("rootless Podman + cgroup v2: PASS")
           PY
-      - name: Pull test image then lock its resolved digest
+      - name: Pull immutable test image
+        env:
+          VAP_TEST_IMAGE: docker.io/library/python@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
         run: |
-          podman pull --quiet docker.io/library/python:3.13-slim
-          python - <<'PY'
-          import json
-          import os
-          import subprocess
-
-          raw = subprocess.check_output([
-              "podman", "image", "inspect", "--format", "{{json .RepoDigests}}",
-              "docker.io/library/python:3.13-slim",
-          ], text=True)
-          digests = json.loads(raw)
-          image = next((value for value in digests if value.startswith("docker.io/library/python@sha256:")), None)
-          assert image and len(image.rsplit("@sha256:", 1)[-1]) == 64, f"immutable repo digest unavailable: {digests}"
-          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
-              env.write(f"VAP_TEST_IMAGE={image}\n")
-          print(f"Using digest-pinned test image: {image}")
-          PY
+          podman pull --quiet "$VAP_TEST_IMAGE"
+          podman image exists "$VAP_TEST_IMAGE"
+          echo "Using immutable test image: $VAP_TEST_IMAGE"
       - name: Run adversarial container scenarios
+        env:
+          VAP_TEST_IMAGE: docker.io/library/python@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+          VAP_REPLAY_LABEL: ${{ matrix.replay }}
+          VAP_REPLAY_REPORT: ${{ runner.temp }}/vap-replay-${{ matrix.replay }}.json
         run: python tests/podman_integration.py
+      - name: Upload VAP replay report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vap-replay-${{ matrix.replay }}
+          path: ${{ runner.temp }}/vap-replay-${{ matrix.replay }}.json
+          if-no-files-found: error
+          retention-days: 7
+
+
+  replay-agreement:
+    if: always()
+    needs: sandbox-integration
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: experiments/reproducibility-lab-v0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Download both runner reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: vap-replay-*
+          path: ${{ runner.temp }}/replay-reports
+          merge-multiple: true
+      - name: Require exact replay agreement
+        run: |
+          python -m vap_lab.replay \
+            --left "$RUNNER_TEMP/replay-reports/vap-replay-runner-a.json" \
+            --right "$RUNNER_TEMP/replay-reports/vap-replay-runner-b.json"

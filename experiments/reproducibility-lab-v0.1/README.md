@@ -16,14 +16,16 @@ Test whether a software submission can be evaluated in a bounded, content-addres
 - Expected outputs are retained by the host harness and never mounted in the candidate container.
 - Verdict digest excludes timestamps and variable telemetry. It binds task/source/test/policy commitments and the runtime identity.
 - VAP verification validates telemetry shape and consistency with the committed runtime-identity digest; the envelope remains unsigned, so telemetry is not tamper-proof.
-- Dedicated Linux CI executes seven real rootless-Podman scenarios against an OCI image resolved and pinned by digest.
+- Dedicated Linux CI executes seven real rootless-Podman scenarios against an immutable OCI image digest.
+- The sandbox suite runs twice on separate GitHub-hosted Ubuntu 24.04 workers, uploads verifier-checked VAPs, and fails if task/source/test/policy commitments, runtime identity, or verdict-core results differ. Timestamps and non-verdict telemetry are excluded from core comparison by design.
+- This is cross-worker replay within one CI provider/control plane, not independent-provider or independent-trust-domain attestation.
 - VAP integrity validation and fail-closed behavior tests.
 
 ## Not implemented
 
 - Trusted seccomp/eBPF/audit observer. A policy violation is never inferred from stderr or a guest self-report.
 - Actual cgroup CPU-time and peak-memory collection. These fields remain null.
-- VAP signing, independent verifier quorum, zkVM/TEE attestation, disputes, or on-chain settlement.
+- Trusted seccomp/eBPF/audit observation of forbidden behavior, actual cgroup CPU-time and peak-memory collection, VAP signing, independent verifier quorum, zkVM/TEE attestation, disputes, or on-chain settlement.
 - A production hidden-test service. Included demo tests are public fixtures and not appropriate as a funded production test suite.
 
 ## Requirements
@@ -53,4 +55,4 @@ Rootless Podman is defense in depth, not a proof of complete host-compromise res
 
 ## Proofline relationship
 
-This folder is an isolated research experiment. It does not change Proofline's current product acceptance rules or production path. Promotion into a supported product vertical requires real Podman adversarial runs, an independent replay, a reviewed observer model, and a product-demand decision.
+This folder is an isolated research experiment. It does not change Proofline's current product acceptance rules or production path. Promotion into a supported product vertical requires real Podman adversarial runs, cross-worker replay plus a replay on a different trust domain, measured-resource validation, a reviewed observer model, and a product-demand decision.
