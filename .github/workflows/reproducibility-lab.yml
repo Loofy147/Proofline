@@ -1,0 +1,42 @@
+name: reproducibility-lab
+
+on:
+  push:
+    paths:
+      - "experiments/reproducibility-lab-v0.1/**"
+      - ".github/workflows/reproducibility-lab.yml"
+  pull_request:
+    paths:
+      - "experiments/reproducibility-lab-v0.1/**"
+      - ".github/workflows/reproducibility-lab.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/reproducibility-lab-v0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile
+        run: python -m compileall -q vap_lab tests
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate task and test commitments
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from vap_lab.canonical import digest_json, load_json_strict
+          from vap_lab.contract import validate_task
+          from vap_lab.runner import load_test_suite
+
+          task = load_json_strict(Path("examples/task.demo.json").read_bytes())
+          validate_task(task)
+          suite, digest = load_test_suite("examples/public-demo-tests.json")
+          assert digest == task["verification_policy"]["sealed_test_hash"], "task/test commitment mismatch"
+          assert suite["schema_version"] == "vap.tests.v0.1"
+          print("task profile and test-suite commitment: PASS")
+          PY

@@ -1,0 +1,27 @@
+{
+  "schema_version": "vap.task.v0.1",
+  "task_id": "math-parser-sanitize-demo-001",
+  "runtime_profile": {
+    "engine": "podman-rootless",
+    "image": "docker.io/library/python@sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "network": "none",
+    "read_only_rootfs": true,
+    "cap_drop": ["ALL"],
+    "tmpfs_mb": 16,
+    "limits": {
+      "timeout_seconds": 10,
+      "memory_mb": 256,
+      "cpus": "1.0",
+      "pids_max": 32,
+      "max_output_bytes": 65536,
+      "max_input_bytes": 65536,
+      "max_source_bytes": 1048576,
+      "max_source_files": 64
+    },
+    "command": ["python3", "/workspace/solution.py"]
+  },
+  "verification_policy": {
+    "sealed_test_hash": "sha256:d157e30c133a6168b22f39a5a690003a94f4412e5ec0aa4d8da23d7414a9a25e",
+    "protocol": "stdin_stdout_exact_v1"
+  }
+}
