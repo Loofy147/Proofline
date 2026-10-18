@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from vap_lab.runner import PodmanRootlessRunner, load_test_suite
+from vap_lab.runner import PodmanRootlessRunner, extract_runtime_identity, load_test_suite
 from test_contract import VALID_TASK
 
 
@@ -28,6 +28,39 @@ class PodmanCommandTests(unittest.TestCase):
         self.assertEqual(len(volume_args), 1)
         self.assertEqual(volume_args[0], "/tmp/vap-stage:/workspace:ro,Z")
         self.assertFalse(any("test" in argument.lower() for argument in volume_args))
+
+
+class RuntimeIdentityTests(unittest.TestCase):
+    def test_identity_captures_oci_runtime_and_conmon_from_podman_info(self):
+        info = {
+            "host": {
+                "security": {"rootless": True},
+                "cgroupVersion": "v2",
+                "ociRuntime": {"name": "crun", "version": "crun version 1.16", "package": "crun-1.16"},
+                "conmon": {"version": "conmon version 2.1", "package": "conmon-2.1"},
+            }
+        }
+        version = {"Client": {"Version": "4.9.3", "APIVersion": "4.9.3"}}
+        identity = extract_runtime_identity(info, version, cgroup_version="v2")
+        self.assertEqual(identity["podman_version"], "4.9.3")
+        self.assertEqual(identity["oci_runtime_name"], "crun")
+        self.assertEqual(identity["oci_runtime_version"], "crun version 1.16")
+        self.assertEqual(identity["conmon_version"], "conmon version 2.1")
+        self.assertEqual(identity["cgroup_version"], "v2")
+        self.assertIs(identity["rootless"], True)
+
+    def test_missing_runtime_identity_is_rejected(self):
+        info = {
+            "host": {
+                "security": {"rootless": True},
+                "cgroupVersion": "v2",
+                "ociRuntime": {},
+                "conmon": {},
+            }
+        }
+        version = {"Client": {"Version": "4.9.3", "APIVersion": "4.9.3"}}
+        with self.assertRaisesRegex(ValueError, "runtime identity"):
+            extract_runtime_identity(info, version, cgroup_version="v2")
 
 
 class TestSuiteTests(unittest.TestCase):
