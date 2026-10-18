@@ -41,6 +41,74 @@ VALID_TASK = {
 }
 
 
+def sample_core():
+    runtime_identity = {
+        "podman_version": "4.9.3",
+        "podman_api_version": "4.9.3",
+        "oci_runtime_name": "crun",
+        "oci_runtime_version": "crun version 1.16",
+        "conmon_version": "conmon version 2.1",
+        "cgroup_version": "v2",
+        "rootless": True,
+    }
+    core = {
+        "profile": "vap.verdict-core.v0.1",
+        "task_id": "t1",
+        "task_digest": "sha256:" + "c" * 64,
+        "source_digest": "sha256:" + "a" * 64,
+        "source_file_count": 1,
+        "source_total_bytes": 1,
+        "test_suite_digest": "sha256:" + "b" * 64,
+        "runtime_image": "registry.example/python@sha256:" + "d" * 64,
+        "runner_version": "test",
+        "runtime_identity_digest": digest_json(runtime_identity),
+        "policy_digest": "sha256:" + "e" * 64,
+        "verdict": "PASS",
+        "reason": "all_cases_passed",
+        "cases_total": 1,
+        "cases_attempted": 1,
+        "cases_passed": 1,
+        "case_results": [{
+            "index": 0,
+            "status": "PASS",
+            "reason": "exact_output_match",
+            "exit_code": 0,
+            "stdout_digest": "sha256:" + "f" * 64,
+            "stderr_digest": "sha256:" + "0" * 64,
+        }],
+    }
+    return core, runtime_identity
+
+
+def sample_telemetry(runtime_identity, *, wall_ms=10):
+    return {
+        "total_wall_clock_ms": wall_ms,
+        "runtime_preflight": {
+            "available": True,
+            "message": "runtime ready",
+            "rootless_confirmed": True,
+            "runtime_identity": runtime_identity,
+        },
+        "case_runs": [{
+            "index": 0,
+            "wall_clock_ms": wall_ms,
+            "captured_stdout_bytes": 3,
+            "captured_stderr_bytes": 0,
+            "total_observed_output_bytes": 3,
+            "container_started": True,
+            "oom_killed": False,
+            "container_exit_code": 0,
+            "cpu_time_ns": None,
+            "peak_memory_bytes": None,
+            "resource_measurement": "NOT_COLLECTED_IN_V0.1",
+        }],
+        "host_kernel": "test-kernel",
+        "target_cpu_time_ns": None,
+        "target_peak_memory_bytes": None,
+        "resource_measurement_status": "NOT_COLLECTED_IN_V0.1",
+    }
+
+
 class CanonicalJsonTests(unittest.TestCase):
     def test_canonical_bytes_ignore_object_key_order(self):
         self.assertEqual(canonical_bytes({"b": 2, "a": 1}), b'{"a":1,"b":2}')
@@ -134,33 +202,36 @@ class VerdictTests(unittest.TestCase):
         self.assertEqual(result.status, "INFRASTRUCTURE_FAILURE")
 
     def test_verdict_digest_excludes_telemetry_and_timestamps(self):
-        core = {
-            "profile": "vap.verdict-core.v0.1", "task_id": "t1",
-            "task_digest": "sha256:" + "c" * 64,
-            "source_digest": "sha256:" + "a" * 64,
-            "source_file_count": 1, "source_total_bytes": 1,
-            "test_suite_digest": "sha256:" + "b" * 64,
-            "runtime_image": "registry.example/python@sha256:" + "d" * 64,
-            "runner_version": "test", "runtime_identity_digest": "sha256:" + "1" * 64, "policy_digest": "sha256:" + "e" * 64,
-            "verdict": "PASS", "reason": "all_cases_passed",
-            "cases_total": 1, "cases_attempted": 1, "cases_passed": 1,
-            "case_results": [{
-                "index": 0, "status": "PASS", "reason": "exact_output_match", "exit_code": 0,
-                "stdout_digest": "sha256:" + "f" * 64, "stderr_digest": "sha256:" + "0" * 64,
-            }],
-        }
+        core, runtime_identity = sample_core()
         self.assertEqual(verdict_digest(core), verdict_digest(core))
         self.assertEqual(len({verdict_digest(core) for _ in range(100)}), 1)
         original_digest = verdict_digest(core)
         changed_runtime = dict(core, runtime_identity_digest="sha256:" + "2" * 64)
         self.assertNotEqual(original_digest, verdict_digest(changed_runtime))
-        vap_a = build_vap(core, {"wall_ms": 10}, timestamp_utc=100)
-        vap_b = build_vap(core, {"wall_ms": 99}, timestamp_utc=999)
+        vap_a = build_vap(core, sample_telemetry(runtime_identity, wall_ms=10), timestamp_utc=100)
+        vap_b = build_vap(core, sample_telemetry(runtime_identity, wall_ms=99), timestamp_utc=999)
         self.assertEqual(vap_a["verdict_digest"], vap_b["verdict_digest"])
         self.assertNotEqual(vap_a["telemetry"], vap_b["telemetry"])
         self.assertTrue(verify_vap_document(vap_a))
         vap_b["verdict_core"]["verdict"] = "FAIL_TESTS"
         self.assertFalse(verify_vap_document(vap_b))
+
+    def test_vap_rejects_telemetry_that_does_not_match_committed_runtime_identity(self):
+        core, runtime_identity = sample_core()
+        vap = build_vap(core, sample_telemetry(runtime_identity))
+        vap["telemetry"]["runtime_preflight"]["runtime_identity"]["oci_runtime_name"] = "forged-runtime"
+        self.assertFalse(verify_vap_document(vap))
+
+    def test_vap_rejects_uncollected_resource_metrics_claimed_as_measured(self):
+        core, runtime_identity = sample_core()
+        vap = build_vap(core, sample_telemetry(runtime_identity))
+        vap["telemetry"]["target_cpu_time_ns"] = 123456
+        self.assertFalse(verify_vap_document(vap))
+
+    def test_vap_rejects_incomplete_telemetry_shape(self):
+        core, _runtime_identity = sample_core()
+        vap = build_vap(core, {"wall_ms": 10})
+        self.assertFalse(verify_vap_document(vap))
 
 
 class SourceSnapshotTests(unittest.TestCase):
