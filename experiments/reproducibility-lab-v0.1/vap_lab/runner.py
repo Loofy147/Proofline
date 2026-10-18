@@ -206,6 +206,7 @@ class PodmanRootlessRunner:
         return [
             self.podman_binary or "podman",
             "run",
+            "--interactive",
             "--pull=never",
             "--name", name,
             "--label", f"vap.run_id={name}",
