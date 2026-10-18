@@ -19,6 +19,14 @@ def number(value):
         return result if result.is_finite() else None
     except InvalidOperation: return None
 
+def neutralize_spreadsheet_cell(value: str) -> str:
+    """Prefix formula-like exported text while preserving ordinary negative numbers."""
+    if value.startswith(("=", "+", "@")):
+        return "'" + value
+    if value.startswith("-") and number(value) is None:
+        return "'" + value
+    return value
+
 def analyze(path: Path):
     if not path.is_file(): raise FileNotFoundError("Input file not found: "+str(path))
     size=path.stat().st_size
@@ -89,7 +97,7 @@ def main():
         jp.write_text(json.dumps(report,indent=2,ensure_ascii=False)+"\n",encoding="utf-8")
         with cp.open("w",encoding="utf-8-sig",newline="") as f:
             fields=["column_index_1_based","column","nonempty_values","missing_values","inferred_type","numeric_values","min","max","sum","mean"]
-            writer=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore"); writer.writeheader(); writer.writerows(report["columns"])
+            writer=csv.DictWriter(f,fieldnames=fields,extrasaction="ignore"); writer.writeheader(); writer.writerows([{**row, "column": neutralize_spreadsheet_cell(str(row["column"]))} for row in report["columns"]])
         print(json.dumps({"status":report["summary"]["status"],"rows":report["summary"]["data_rows"],"columns":report["summary"]["header_columns"],"errors":report["summary"]["structural_error_count"],"warnings":report["summary"]["warning_count"],"json_report":str(jp),"column_profile":str(cp)},indent=2))
         return 1 if report["summary"]["status"]=="FAIL" else 0
     except Exception as exc:
