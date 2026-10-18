@@ -1,0 +1,133 @@
+name: reproducibility-lab
+
+on:
+  push:
+    paths:
+      - "experiments/reproducibility-lab-v0.1/**"
+      - ".github/workflows/reproducibility-lab.yml"
+  pull_request:
+    paths:
+      - "experiments/reproducibility-lab-v0.1/**"
+      - ".github/workflows/reproducibility-lab.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: experiments/reproducibility-lab-v0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Compile
+        run: python -m compileall -q vap_lab tests
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Validate task and test commitments
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from vap_lab.canonical import digest_json, load_json_strict
+          from vap_lab.contract import validate_task
+          from vap_lab.runner import load_test_suite
+
+          task = load_json_strict(Path("examples/task.demo.json").read_bytes())
+          validate_task(task)
+          suite, digest = load_test_suite("examples/public-demo-tests.json")
+          assert digest == task["verification_policy"]["sealed_test_hash"], "task/test commitment mismatch"
+          assert suite["schema_version"] == "vap.tests.v0.1"
+          print("task profile and test-suite commitment: PASS")
+          PY
+
+      - name: Validate JSON schema and VAP metric contract
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          for name in ("task.schema.json", "tests.schema.json", "vap.schema.json"):
+              with Path("schemas", name).open(encoding="utf-8") as handle:
+                  json.load(handle)
+          schema = json.loads(Path("schemas/vap.schema.json").read_text(encoding="utf-8"))
+          telemetry = schema["$defs"]["telemetry"]["properties"]
+          assert telemetry["target_cpu_time_ns"] == {"type": "null"}
+          assert telemetry["target_peak_memory_bytes"] == {"type": "null"}
+          cases = telemetry["case_runs"]["items"]["properties"]
+          assert cases["cpu_time_ns"] == {"type": "null"}
+          assert cases["peak_memory_bytes"] == {"type": "null"}
+          identity = telemetry["runtime_preflight"]["properties"]["runtime_identity"]["oneOf"][1]["properties"]
+          assert identity["cgroup_version"] == {"const": "v2"}
+          assert identity["rootless"] == {"const": True}
+          print("JSON schema syntax and telemetry-v0.1 constraints: PASS")
+          PY
+
+  sandbox-integration:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: experiments/reproducibility-lab-v0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Ensure rootless Podman prerequisites
+        run: |
+          if ! command -v podman >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y podman uidmap slirp4netns fuse-overlayfs
+          fi
+          user="$(id -un)"
+          uid="$(id -u)"
+          if ! grep -q "^${user}:" /etc/subuid; then
+            start=$((100000 + uid * 65536))
+            echo "${user}:${start}:65536" | sudo tee -a /etc/subuid
+          fi
+          if ! grep -q "^${user}:" /etc/subgid; then
+            start=$((100000 + uid * 65536))
+            echo "${user}:${start}:65536" | sudo tee -a /etc/subgid
+          fi
+          command -v newuidmap
+          command -v newgidmap
+          podman --version
+      - name: Require rootless mode and cgroup v2
+        run: |
+          podman info --format json > "$RUNNER_TEMP/podman-info.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          info = json.loads(Path(os.environ["RUNNER_TEMP"], "podman-info.json").read_text())
+          host = info.get("host", {})
+          security = host.get("security", {})
+          assert security.get("rootless") is True, f"rootless mode not confirmed: {security}"
+          assert host.get("cgroupVersion") == "v2", f"cgroup v2 not confirmed: {host.get('cgroupVersion')}"
+          print("rootless Podman + cgroup v2: PASS")
+          PY
+      - name: Pull test image then lock its resolved digest
+        run: |
+          podman pull --quiet docker.io/library/python:3.13-slim
+          python - <<'PY'
+          import json
+          import os
+          import subprocess
+
+          raw = subprocess.check_output([
+              "podman", "image", "inspect", "--format", "{{json .RepoDigests}}",
+              "docker.io/library/python:3.13-slim",
+          ], text=True)
+          digests = json.loads(raw)
+          image = next((value for value in digests if value.startswith("docker.io/library/python@sha256:")), None)
+          assert image and len(image.rsplit("@sha256:", 1)[-1]) == 64, f"immutable repo digest unavailable: {digests}"
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env:
+              env.write(f"VAP_TEST_IMAGE={image}\n")
+          print(f"Using digest-pinned test image: {image}")
+          PY
+      - name: Run adversarial container scenarios
+        run: python tests/podman_integration.py

@@ -1,0 +1,7 @@
+{
+  "schema_version": "vap.tests.v0.1",
+  "cases": [
+    {"stdin": "10 20 30\n", "expected_stdout": "60\n"},
+    {"stdin": "5 15 abc 20\n", "expected_stdout": "40\n"}
+  ]
+}

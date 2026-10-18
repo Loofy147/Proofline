@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/vap/tests-v0.1.schema.json",
+  "title": "VAP Test Suite v0.1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "cases"],
+  "properties": {
+    "schema_version": {"const": "vap.tests.v0.1"},
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 10000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stdin", "expected_stdout"],
+        "properties": {
+          "stdin": {"type": "string"},
+          "expected_stdout": {"type": "string"}
+        }
+      }
+    }
+  }
+}
