@@ -66,6 +66,13 @@ def validate_task(task: Any) -> None:
              "command arguments must be nonempty strings without NUL")
     executable = command[0].rsplit("/", 1)[-1].lower()
     _require(executable not in _SHELLS, "shell entrypoints are forbidden; use direct argv execution")
+    wrapper_names = {"env", "busybox", "toybox"}
+    if executable in wrapper_names:
+        argument_basenames = {arg.rsplit("/", 1)[-1].lower() for arg in command[1:]}
+        _require(not argument_basenames.intersection(_SHELLS),
+                 "shell applets launched through command wrappers are forbidden")
+        _require(not any(arg == "-S" or arg == "--split-string" or arg.startswith("--split-string=") for arg in command[1:]),
+                 "command-wrapper split-string launch is forbidden")
     _require(not (executable in {"python", "python3", "node", "ruby", "perl"} and any(arg in {"-c", "-e", "--eval"} for arg in command[1:])),
              "inline-code command flags are forbidden; execute a staged file instead")
 
