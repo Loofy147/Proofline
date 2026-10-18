@@ -28,4 +28,10 @@ class VerifyCsvTests(unittest.TestCase):
    rows=list(csv.DictReader(handle))
   self.assertEqual(rows[0]['column'],"'=1+1")
   self.assertEqual(rows[1]['column'],"-12.5")
+ def test_profile_csv_neutralizes_other_formula_prefixes(self):
+  p,_,out=self.run_cli('+1+1,@cmd,-cmd\n1,2,3\n4,5,6\n7,8,9\n')
+  self.assertEqual(p.returncode,0,p.stderr)
+  with (out/'sample_column_profile.csv').open('r',newline='',encoding='utf-8-sig') as handle:
+   rows=list(csv.DictReader(handle))
+  self.assertEqual([row['column'] for row in rows],["'+1+1","'@cmd","'-cmd"])
 if __name__=='__main__': unittest.main(verbosity=2)
