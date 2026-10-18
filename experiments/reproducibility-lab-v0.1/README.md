@@ -1,6 +1,6 @@
-# Reproducibility Lab v0.1
+# Reproducibility Lab — Versioned VAP profiles
 
-Status: **experimental research module** inside Proofline. This is separate from Proofline's current CSV-audit product vertical. It does not include blockchain settlement, wallet management, signature authority, or payment integration. An unsigned VAP never authorizes payment.
+Status: **experimental research module** inside Proofline. The legacy VAP v0.1 verifier remains available; the current runner emits VAP v0.2 with best-effort cgroup v2 resource telemetry. This is separate from Proofline's current CSV-audit product vertical. It does not include blockchain settlement, wallet management, signature authority, or payment integration. Neither unsigned profile authorizes payment.
 
 ## Purpose
 
@@ -16,7 +16,7 @@ Test whether a software submission can be evaluated in a bounded, content-addres
 - Expected outputs are retained by the host harness and never mounted in the candidate container.
 - Verdict digest excludes timestamps and variable telemetry. It binds task/source/test/policy commitments and the runtime identity.
 - VAP verification validates telemetry shape and consistency with the committed runtime-identity digest; the envelope remains unsigned, so telemetry is not tamper-proof.
-- Dedicated Linux CI executes seven real rootless-Podman scenarios against an immutable OCI image digest.
+- Dedicated Linux CI executes eight real rootless-Podman scenarios against an immutable OCI image digest, including an explicit cgroup v2 CPU/memory measurement challenge.
 - The sandbox suite runs twice on separate GitHub-hosted Ubuntu 24.04 workers, uploads verifier-checked VAPs, and fails if task/source/test/policy commitments, runtime identity, or verdict-core results differ. Timestamps and non-verdict telemetry are excluded from core comparison by design.
 - This is cross-worker replay within one CI provider/control plane, not independent-provider or independent-trust-domain attestation.
 - VAP integrity validation and fail-closed behavior tests.
@@ -24,9 +24,11 @@ Test whether a software submission can be evaluated in a bounded, content-addres
 ## Not implemented
 
 - Trusted seccomp/eBPF/audit observer. A policy violation is never inferred from stderr or a guest self-report.
-- Actual cgroup CPU-time and peak-memory collection. These fields remain null.
-- Trusted seccomp/eBPF/audit observation of forbidden behavior, actual cgroup CPU-time and peak-memory collection, VAP signing, independent verifier quorum, zkVM/TEE attestation, disputes, or on-chain settlement.
+
+- Trusted seccomp/eBPF/audit observation of forbidden behavior, VAP signing, independent verifier quorum, zkVM/TEE attestation, disputes, or on-chain settlement.
 - A production hidden-test service. Included demo tests are public fixtures and not appropriate as a funded production test suite.
+- Independent-provider replay. Both CI workers share one provider/control plane.
+- Authenticity of VAP v0.2 telemetry. cgroup counters are measured by the runner but remain unsigned and descriptive; verifier checks only internal consistency.
 
 ## Requirements
 
@@ -55,4 +57,4 @@ Rootless Podman is defense in depth, not a proof of complete host-compromise res
 
 ## Proofline relationship
 
-This folder is an isolated research experiment. It does not change Proofline's current product acceptance rules or production path. Promotion into a supported product vertical requires real Podman adversarial runs, cross-worker replay plus a replay on a different trust domain, measured-resource validation, a reviewed observer model, and a product-demand decision.
+This folder is an isolated research experiment. It does not change Proofline's current product acceptance rules or production path. Promotion into a supported product vertical requires real Podman adversarial runs, replay on a different trust domain, a reviewed trusted-observer model, signed attestation and dispute policy, and a product-demand decision.

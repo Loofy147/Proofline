@@ -10,18 +10,30 @@ from .canonical import digest_json
 from .evaluator import STATUSES
 
 
+_PROFILES = {
+    "vap.verdict-core.v0.1": ("vap.attestation.v0.1", "vap-verdict-core-v0.1"),
+    "vap.verdict-core.v0.2": ("vap.attestation.v0.2", "vap-verdict-core-v0.2"),
+}
+
+
 def verdict_digest(core: dict[str, Any]) -> str:
     if core.get("verdict") not in STATUSES:
         raise ValueError("unknown verdict status")
-    return digest_json({"domain": "vap-verdict-core-v0.1", "core": core})
+    profile = core.get("profile")
+    if profile not in _PROFILES:
+        raise ValueError("unsupported verdict-core profile")
+    return digest_json({"domain": _PROFILES[profile][1], "core": core})
 
 
 def build_vap(core: dict[str, Any], telemetry: dict[str, Any], *, timestamp_utc: int | None = None, run_id: str | None = None) -> dict[str, Any]:
     if core.get("verdict") not in STATUSES:
         raise ValueError("unknown verdict status")
+    profile = core.get("profile")
+    if profile not in _PROFILES:
+        raise ValueError("unsupported verdict-core profile")
     stamp = int(time.time()) if timestamp_utc is None else timestamp_utc
     return {
-        "schema_version": "vap.attestation.v0.1",
+        "schema_version": _PROFILES[profile][0],
         "run_id": run_id or str(uuid.uuid4()),
         "timestamp_utc": stamp,
         "verdict_core": core,
@@ -41,11 +53,10 @@ def _is_nonnegative_int(value: Any) -> bool:
 
 
 def _valid_telemetry(telemetry: Any, core: dict[str, Any]) -> bool:
-    """Validate telemetry schema and consistency with the verdict core.
+    """Validate telemetry structure and per-profile metric invariants.
 
-    Telemetry is intentionally excluded from the verdict digest and remains
-    unauthenticated in the unsigned v0.1 envelope. This check rejects malformed
-    or internally inconsistent records; it does not make telemetry tamper-proof.
+    VAP telemetry is unsigned and excluded from the verdict digest. Validation
+    detects inconsistencies but does not authenticate the reported measurements.
     """
     telemetry_fields = {
         "total_wall_clock_ms", "runtime_preflight", "case_runs", "host_kernel",
@@ -58,12 +69,19 @@ def _valid_telemetry(telemetry: Any, core: dict[str, Any]) -> bool:
     if telemetry.get("host_kernel") is not None and not isinstance(telemetry.get("host_kernel"), str):
         return False
     for field in ("target_cpu_time_ns", "target_peak_memory_bytes"):
-        value = telemetry.get(field)
-        if value is not None and not _is_nonnegative_int(value):
+        if not (telemetry.get(field) is None or _is_nonnegative_int(telemetry.get(field))):
             return False
-    if telemetry.get("resource_measurement_status") != "NOT_COLLECTED_IN_V0.1":
-        return False
-    if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+
+    profile = core.get("profile")
+    if profile == "vap.verdict-core.v0.1":
+        if telemetry.get("resource_measurement_status") != "NOT_COLLECTED_IN_V0.1":
+            return False
+        if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+            return False
+    elif profile == "vap.verdict-core.v0.2":
+        if telemetry.get("resource_measurement_status") not in {"COLLECTED", "PARTIAL", "UNAVAILABLE", "NOT_RUN"}:
+            return False
+    else:
         return False
 
     preflight = telemetry.get("runtime_preflight")
@@ -134,27 +152,83 @@ def _valid_telemetry(telemetry: Any, core: dict[str, Any]) -> bool:
         exit_code = item.get("container_exit_code")
         if exit_code is not None and (not isinstance(exit_code, int) or isinstance(exit_code, bool)):
             return False
-        for field in ("cpu_time_ns", "peak_memory_bytes"):
-            value = item.get(field)
+
+        cpu_time = item.get("cpu_time_ns")
+        peak_memory = item.get("peak_memory_bytes")
+        for value in (cpu_time, peak_memory):
             if value is not None and not _is_nonnegative_int(value):
                 return False
-            if value is not None:
+        measurement = item.get("resource_measurement")
+        if profile == "vap.verdict-core.v0.1":
+            if cpu_time is not None or peak_memory is not None:
                 return False
-        if item.get("resource_measurement") != "NOT_COLLECTED_IN_V0.1":
-            return False
+            if measurement != "NOT_COLLECTED_IN_V0.1":
+                return False
+        else:
+            both_measured = cpu_time is not None and peak_memory is not None
+            one_measured = (cpu_time is None) != (peak_memory is None)
+            if measurement == "CGROUP_V2_MEASURED":
+                if not both_measured:
+                    return False
+            elif measurement == "CGROUP_V2_PARTIAL":
+                if not one_measured:
+                    return False
+            elif measurement == "UNAVAILABLE":
+                if cpu_time is not None or peak_memory is not None:
+                    return False
+            elif measurement == "NOT_RUN":
+                if cpu_time is not None or peak_memory is not None or item["container_started"]:
+                    return False
+            else:
+                return False
+
+    if profile == "vap.verdict-core.v0.2":
+        statuses = [item["resource_measurement"] for item in case_runs]
+        has_any_metric = any(
+            item["cpu_time_ns"] is not None or item["peak_memory_bytes"] is not None
+            for item in case_runs
+        )
+        all_measured = bool(case_runs) and all(
+            item["resource_measurement"] == "CGROUP_V2_MEASURED"
+            for item in case_runs
+        )
+        all_not_run = bool(case_runs) and all(status == "NOT_RUN" for status in statuses)
+        top_status = telemetry["resource_measurement_status"]
+        cpu_total = sum(item["cpu_time_ns"] for item in case_runs) if all_measured else None
+        memory_peak = max((item["peak_memory_bytes"] for item in case_runs), default=None) if all_measured else None
+
+        if top_status == "COLLECTED":
+            if not all_measured or telemetry["target_cpu_time_ns"] != cpu_total:
+                return False
+            if telemetry["target_peak_memory_bytes"] != memory_peak:
+                return False
+        elif top_status == "PARTIAL":
+            if not has_any_metric or all_measured:
+                return False
+            if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+                return False
+        elif top_status == "UNAVAILABLE":
+            if has_any_metric or not case_runs or all_not_run:
+                return False
+            if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+                return False
+        elif top_status == "NOT_RUN":
+            if not (core.get("cases_attempted") == 0 or all_not_run):
+                return False
+            if telemetry["target_cpu_time_ns"] is not None or telemetry["target_peak_memory_bytes"] is not None:
+                return False
     return True
 
-
 def verify_vap_document(vap: dict[str, Any]) -> bool:
-    """Validate the v0.1 envelope and recompute its verdict digest.
+    """Validate VAP v0.1 or v0.2 structure and recompute its verdict digest.
 
-    This verifies structure/integrity only. It does not authenticate a signer
-    or authorize settlement.
+    Both profiles are unsigned prototypes. Structural verification never
+    authenticates telemetry, a signer, or authorizes financial settlement.
     """
     if not isinstance(vap, dict):
         return False
     required = {"schema_version", "run_id", "timestamp_utc", "verdict_core", "verdict_digest", "telemetry", "attestation"}
-    if set(vap) != required or vap.get("schema_version") != "vap.attestation.v0.1":
+    if set(vap) != required:
         return False
     if not isinstance(vap.get("timestamp_utc"), int) or isinstance(vap.get("timestamp_utc"), bool) or vap["timestamp_utc"] < 0:
         return False
@@ -166,12 +240,17 @@ def verify_vap_document(vap: dict[str, Any]) -> bool:
         return False
 
     core = vap.get("verdict_core")
+    if not isinstance(core, dict):
+        return False
+    profile = core.get("profile")
+    if profile not in _PROFILES or vap.get("schema_version") != _PROFILES[profile][0]:
+        return False
     core_fields = {
         "profile", "task_id", "task_digest", "source_digest", "source_file_count", "source_total_bytes",
         "test_suite_digest", "runtime_image", "runner_version", "runtime_identity_digest", "policy_digest", "verdict", "reason",
         "cases_total", "cases_attempted", "cases_passed", "case_results"
     }
-    if not isinstance(core, dict) or set(core) != core_fields or core.get("profile") != "vap.verdict-core.v0.1":
+    if set(core) != core_fields:
         return False
     if core.get("verdict") not in STATUSES or not isinstance(core.get("case_results"), list):
         return False
@@ -223,14 +302,12 @@ def verify_vap_document(vap: dict[str, Any]) -> bool:
     attestation = vap.get("attestation")
     if not isinstance(attestation, dict) or set(attestation) != {"status", "algorithm", "signer", "signature"}:
         return False
-    # v0.1 deliberately accepts only the unsigned prototype envelope.
     if attestation != {"status": "UNSIGNED_LOCAL_PROTOTYPE", "algorithm": None, "signer": None, "signature": None}:
         return False
     try:
         return vap.get("verdict_digest") == verdict_digest(core)
     except (KeyError, TypeError, ValueError):
         return False
-
 
 def aggregate_status(case_results: list[dict[str, Any]]) -> str:
     statuses = [case["status"] for case in case_results]

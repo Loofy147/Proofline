@@ -19,6 +19,7 @@ from typing import Any
 from .canonical import load_json_strict
 from .evaluator import CaseResult, classify_case
 from .source import stage_readonly_source
+from .resource_metrics import CgroupV2Sampler
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class RunnerTelemetry:
     container_exit_code: int | None
     cpu_time_ns: int | None = None
     peak_memory_bytes: int | None = None
-    cpu_memory_measurement: str = "NOT_COLLECTED_IN_V0.1"
+    cpu_memory_measurement: str = "UNAVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -209,7 +210,7 @@ class PodmanRootlessRunner:
             return RuntimePreflight(False, "digest-pinned image is not available locally; automatic image pulling is disabled", self.podman_binary, True, runtime_identity)
         return RuntimePreflight(True, "Podman rootless mode, cgroup v2, runtime identity, and digest-pinned local image confirmed", self.podman_binary, True, runtime_identity)
 
-    def _inspect(self, name: str) -> dict[str, Any] | None:
+    def _inspect(self, name: str, *, timeout: float = 5.0) -> dict[str, Any] | None:
         assert self.podman_binary
         try:
             result = subprocess.run(
@@ -217,7 +218,7 @@ class PodmanRootlessRunner:
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=5,
+                timeout=timeout,
                 check=False,
                 close_fds=True,
             )
@@ -304,9 +305,11 @@ class PodmanRootlessRunner:
 
         name = "vap-" + uuid.uuid4().hex[:20]
         collector = _BoundedOutput(self.limits["max_output_bytes"])
+        sampler = CgroupV2Sampler()
         process: subprocess.Popen[bytes] | None = None
         stdout_thread: threading.Thread | None = None
         stderr_thread: threading.Thread | None = None
+        probe_thread: threading.Thread | None = None
         termination = "normal"
         process_return_code: int | None = None
         try:
@@ -320,6 +323,20 @@ class PodmanRootlessRunner:
                 start_new_session=True,
             )
             assert process.stdout is not None and process.stderr is not None and process.stdin is not None
+
+            def discover_container_cgroup() -> None:
+                # Keep inspection off the timeout-enforcement thread. Each probe
+                # is bounded; short-lived tasks may legitimately have no sample.
+                while process is not None and process.poll() is None and sampler.cgroup_path is None:
+                    inspect_data = self._inspect(name, timeout=0.2)
+                    state_data = inspect_data.get("State", {}) if isinstance(inspect_data, dict) else {}
+                    pid = state_data.get("Pid", state_data.get("PID")) if isinstance(state_data, dict) else None
+                    if isinstance(pid, int) and not isinstance(pid, bool) and pid > 0 and sampler.discover(pid):
+                        return
+                    time.sleep(0.025)
+
+            probe_thread = threading.Thread(target=discover_container_cgroup, daemon=True)
+            probe_thread.start()
             stdout_thread = threading.Thread(target=collector.reader, args=(process.stdout, collector.stdout), daemon=True)
             stderr_thread = threading.Thread(target=collector.reader, args=(process.stderr, collector.stderr), daemon=True)
             stdout_thread.start()
@@ -339,7 +356,12 @@ class PodmanRootlessRunner:
             stdin_thread = threading.Thread(target=feed_stdin, daemon=True)
             stdin_thread.start()
             deadline = time.monotonic() + self.limits["timeout_seconds"]
+            next_metric_sample = 0.0
             while process.poll() is None:
+                now = time.monotonic()
+                if sampler.cgroup_path is not None and now >= next_metric_sample:
+                    sampler.sample()
+                    next_metric_sample = now + 0.02
                 if collector.exceeded.is_set():
                     termination = "output_limit"
                     try:
@@ -366,6 +388,10 @@ class PodmanRootlessRunner:
                 termination = "infrastructure"
             if 'stdin_thread' in locals():
                 stdin_thread.join(timeout=1)
+            if probe_thread:
+                probe_thread.join(timeout=0.3)
+            if sampler.cgroup_path is not None:
+                sampler.sample()
             if stdout_thread:
                 stdout_thread.join(timeout=2)
             if stderr_thread:
@@ -390,6 +416,11 @@ class PodmanRootlessRunner:
             else:
                 case = classify_case(return_code=container_exit_code, stdout=bytes(collector.stdout), stderr=bytes(collector.stderr), expected=expected, termination="normal")
             elapsed_ms = (time.monotonic_ns() - start_ns) // 1_000_000
+            resource_metrics = sampler.metrics
+            if resource_metrics.cpu_time_ns is not None or resource_metrics.peak_memory_bytes is not None:
+                metric_status = resource_metrics.status
+            else:
+                metric_status = "UNAVAILABLE" if started else "NOT_RUN"
             telemetry = RunnerTelemetry(
                 wall_clock_ms=int(elapsed_ms),
                 stdout_bytes=len(collector.stdout),
@@ -398,12 +429,15 @@ class PodmanRootlessRunner:
                 container_started=started,
                 oom_killed=oom_killed,
                 container_exit_code=container_exit_code,
+                cpu_time_ns=resource_metrics.cpu_time_ns,
+                peak_memory_bytes=resource_metrics.peak_memory_bytes,
+                cpu_memory_measurement=metric_status,
             )
             return ContainerExecution(case, telemetry)
         except (OSError, subprocess.SubprocessError) as exc:
             elapsed_ms = (time.monotonic_ns() - start_ns) // 1_000_000
             case = classify_case(return_code=None, stdout=bytes(collector.stdout), stderr=bytes(collector.stderr), expected=expected, termination="infrastructure")
-            telemetry = RunnerTelemetry(int(elapsed_ms), len(collector.stdout), len(collector.stderr), collector.total_seen, False, None, None)
+            telemetry = RunnerTelemetry(int(elapsed_ms), len(collector.stdout), len(collector.stderr), collector.total_seen, False, None, None, cpu_memory_measurement="UNAVAILABLE")
             return ContainerExecution(case, telemetry)
         finally:
             if process and process.poll() is None:
